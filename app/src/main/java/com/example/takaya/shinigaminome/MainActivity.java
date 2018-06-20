@@ -6,6 +6,7 @@ import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.os.Build;
+import android.support.annotation.NonNull;
 import android.support.v4.app.ActivityCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
@@ -20,8 +21,10 @@ import org.opencv.android.CameraBridgeViewBase;
 import org.opencv.android.LoaderCallbackInterface;
 import org.opencv.android.OpenCVLoader;
 import org.opencv.android.Utils;
+import org.opencv.core.Core;
 import org.opencv.core.Mat;
 import org.opencv.core.MatOfRect;
+import org.opencv.core.Point;
 import org.opencv.core.Rect;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
@@ -31,6 +34,14 @@ import org.opencv.objdetect.CascadeClassifier;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.ListIterator;
+import java.util.Random;
 
 public class MainActivity extends AppCompatActivity
         implements CameraBridgeViewBase.CvCameraViewListener, ActivityCompat.OnRequestPermissionsResultCallback
@@ -45,6 +56,9 @@ public class MainActivity extends AppCompatActivity
     private Size minFaceSize = new Size(0, 0);
     private Mat internalImg;
     Bitmap src;
+    Random rand = new Random();
+    HashMap<Rect, String> faceMap = new HashMap<>();
+    ArrayList<Rect> faceHist = new ArrayList<>();
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this)
     {
@@ -174,8 +188,23 @@ public class MainActivity extends AppCompatActivity
             MatOfRect faces = new MatOfRect();
             faceDetector.detectMultiScale(src, faces, 1.1, 2, 2, minFaceSize, new Size());
             Rect[] facesArray = faces.toArray();
-            for (int i = 0; i < facesArray.length; i++) {
-                Imgproc.rectangle(detected, facesArray[i].tl(), facesArray[i].br(), new Scalar(0, 0, 255), 3);
+
+            for(Rect face : facesArray){
+                String lifeSpan = "";
+
+                for(Rect faceHist : faceHist){
+                    if (Math.abs(faceHist.x - face.x) < 100){
+                        lifeSpan = faceMap.get(faceHist);
+                        break;
+                    }
+                }
+                if (lifeSpan.isEmpty()){
+                    lifeSpan = getLifespan(detected, face.tl());
+                    faceMap.put(face, lifeSpan);
+                    faceHist.add(face);
+                }
+                Point org = new Point(face.x - 300, face.y);
+                Imgproc.putText(detected, lifeSpan, org, Core.FONT_HERSHEY_SCRIPT_SIMPLEX|Core.FONT_ITALIC, 6.0f, new Scalar(0 ,0 , 255), 10);
             }
             Imgproc.applyColorMap(detected, detected, Imgproc.COLORMAP_WINTER);
         }
@@ -184,7 +213,16 @@ public class MainActivity extends AppCompatActivity
         }
 
         return detected;
-//        return  inputFrame;
+    }
+
+    private String getLifespan(Mat src, Point org)
+    {
+        String lifeSpan = "";
+        for (int i = 0; i < 6; i++){
+            lifeSpan += String.valueOf(rand.nextInt(10));
+        }
+        return lifeSpan;
+
     }
 
     @Override
@@ -197,8 +235,8 @@ public class MainActivity extends AppCompatActivity
 
     private void hideSystemUI() {
         View decorView = getWindow().getDecorView();
-        minFaceSize.width = decorView.getWidth() / 10;
-        minFaceSize.height = decorView.getHeight() / 10;
+        minFaceSize.width = decorView.getWidth() / 8;
+        minFaceSize.height = decorView.getHeight() / 8;
         decorView.setSystemUiVisibility(
                 View.SYSTEM_UI_FLAG_IMMERSIVE
                         | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
